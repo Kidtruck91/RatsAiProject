@@ -115,24 +115,20 @@ class Game:
     def handle_card_replacement(self, player, index, drawn_card):
         discarded = player.replace_card(index, drawn_card)
         self.discard_pile.append(discarded)
-
-        # Check if the replaced card is Jack or Queen and apply its effect
         if discarded in ['J', 'Q']:
             self.use_special_power(discarded)
 
     def handle_discard(self, player, drawn_card):
         self.discard_pile.append(drawn_card)
-
-        # Check if the discarded card is Jack or Queen and apply its effect
         if drawn_card in ['J', 'Q']:
             self.use_special_power(drawn_card)
 
     def use_special_power(self, card_value):
-        if card_value == 'Q':  # Queen: Swap cards
+        if card_value == 'Q':
             if input("Do you want to swap a card with the opponent? (y/n) ").lower() == "y":
                 self.swap_card()
 
-        elif card_value == 'J':  # Jack: Peek at any card
+        elif card_value == 'J':
             if input("Do you want to peek at any card? (y/n) ").lower() == "y":
                 self.peek_at_card()
 
@@ -141,13 +137,9 @@ class Game:
         opponent = self.players[(self.turn + 1) % 2]
         card_to_swap = int(input(f"Which card do you want to swap? (1, 2, 3): "))-1
         opponent_card_to_swap = int(input(f"Which of your opponent's cards do you want to swap? (1, 2, 3): "))-1
-
-        # Swap cards between players
         temp = current_player.cards[card_to_swap]
         current_player.cards[card_to_swap] = opponent.cards[opponent_card_to_swap]
         opponent.cards[opponent_card_to_swap] = temp
-
-        # Both players lose knowledge of the swapped cards
         current_player.revealed_cards[card_to_swap] = None
         opponent.revealed_cards[opponent_card_to_swap] = None
 
@@ -170,10 +162,8 @@ class Game:
         self.rats_called = True
         self.rats_caller = self.turn
         print(f"{self.players[self.turn].name} calls 'Rats'!")
-        # The other player gets one last full turn (including the option to replace or discard)
         self.turn = (self.turn + 1) % 2
         self.next_turn()
-        # End the game immediately after the other player's turn is complete
         self.end_game()
 
     def end_game(self):
@@ -183,8 +173,28 @@ class Game:
             print(f"{player.name}'s cards: {player.cards}")
         self.calculate_scores()
 
+    def get_state(self, player):
+        return (player.get_visible_cards(), self.discard_pile[-1] if self.discard_pile else None)
+    
+    def get_reward(self, player):
+        return -player.get_total_score()
+
+    def perform_action(self, player, action):
+        if action == 'draw':
+            drawn_card = self.deck.draw()
+            if drawn_card:
+                self.handle_card_replacement(player, 0, drawn_card)
+                new_state = self.get_state(player)
+                reward = self.get_reward(player)
+                return new_state, reward, self.game_over
+        elif action == 'call_rats':
+            self.call_rats()
+            reward = self.get_reward(player)
+            return self.get_state(player), reward, self.game_over
+        return self.get_state(player), 0, self.game_over  
+
+    
     def calculate_scores(self):
-        # Calculate each player's score and announce the winner
         for player in self.players:
             total = player.get_total_score()
             print(f"{player.name}'s total score: {total}")
