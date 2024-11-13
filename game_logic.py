@@ -1,14 +1,14 @@
-# game_logic.py - Handles game logic
 import random
-
-# Deck class for managing cards
+import numpy as np
+from collections import Counter
+from config import REWARD_FOR_DRAW, BASE_RATS_REWARD, PENALTY_FOR_EARLY_RATS, MIN_TURN_FOR_RATS, REWARD_DECAY_RATE, PENALTY_FOR_HIGH_SCORE_RATS
 class Deck:
     def __init__(self):
         self.cards = self.create_deck()
         random.shuffle(self.cards)
 
     def create_deck(self):
-        # Create a standard 52-card deck with Kings (K), Jacks (J), Queens (Q)
+        # Create a standard 52-card deck with Kings (K), Jacks (J), and Queens (Q)
         deck = []
         for value in range(1, 14):  # 1 to 13
             if value == 11:  # Jack
@@ -19,35 +19,32 @@ class Deck:
                 card_value = 'K'
             else:
                 card_value = value
-            deck.extend([card_value] * 4)  # 4 of each value (for each suit)
+            deck.extend([card_value] * 4)  # 4 of each value (one per suit)
         return deck
 
     def draw(self):
-        if len(self.cards) > 0:
-            return self.cards.pop()
-        else:
-            return None  # No more cards to draw
+        return self.cards.pop() if self.cards else None
 
-# Player class for handling player actions
 class Player:
     def __init__(self, name):
         self.name = name
-        self.cards = [None, None, None]  # 3 cards, face-down initially
-        self.revealed_cards = [None, None, None]  # Revealed card values
+        self.cards = [None, None, None]  # The player's three cards
+        self.revealed_cards = [None, None, None]  # Known values for the player
+        self.known_opponent_cards = set()  # Tracks specific opponent cards the player has seen
 
     def set_initial_cards(self, card1, card2, card3):
         self.cards = [card1, card2, card3]
-        self.revealed_cards[0] = card1  # Player gets to see the first and third cards
-        self.revealed_cards[2] = card3
+        self.revealed_cards[0] = card1  # Initially reveal first card
+        self.revealed_cards[1] = card2  # Initially reveal second card
+        self.revealed_cards[2] = "?"  # Third card is hidden
 
     def replace_card(self, index, new_card):
         old_card = self.cards[index]
         self.cards[index] = new_card
-        self.revealed_cards[index] = new_card  # Player knows the new card
-        return old_card  # Return the discarded card
+        self.revealed_cards[index] = new_card  # Update visibility
+        return old_card  # Discarded card
 
     def get_visible_cards(self):
-        # Only show what the player remembers (initial revealed cards), '?' for hidden or swapped cards
         return [self.revealed_cards[i] if self.revealed_cards[i] is not None else "?" for i in range(3)]
 
     def get_total_score(self):
@@ -61,154 +58,147 @@ class Player:
                 total += card
         return total
 
-# Game class to handle game logic
+    def knows_opponent_card(self, card):
+        """Check if the player knows a specific opponent card."""
+        return card in self.known_opponent_cards
+
+    def add_known_opponent_card(self, card):
+        """Mark a specific opponent card as known (e.g., after peeking with Jack)."""
+        self.known_opponent_cards.add(card)
+
 class Game:
     def __init__(self, player1, player2):
         self.deck = Deck()
-        self.discard_pile = []
+        self.discard_pile = []  # Tracks all discarded cards
         self.players = [player1, player2]
-        self.turn = 0  # Track whose turn it is
+        self.turn = 0
         self.rats_called = False
         self.game_over = False
-        self.rats_caller = None
+        self.deal_initial_cards()
+
+    def handle_card_replacement(self, player, index, drawn_card):
+        """Replace a card in the player's hand and add the old card to the discard pile."""
+        discarded = player.replace_card(index, drawn_card)
+        self.discard_pile.append(discarded)
 
     def deal_initial_cards(self):
-        # Deal initial cards to both players
         for player in self.players:
             player.set_initial_cards(self.deck.draw(), self.deck.draw(), self.deck.draw())
 
-    def next_turn(self):
-        if self.game_over:
-            return
-
-        current_player = self.players[self.turn]
-        print(f"\n{current_player.name}'s turn.")
-        print(f"Your cards: {current_player.get_visible_cards()}")
-        print(f"Top of the discard pile: {self.discard_pile[-1] if self.discard_pile else 'Empty'}")
-
-        # Player chooses to draw a card or call Rats, only if Rats hasn't already been called
-        if not self.rats_called:
-            action = input("Do you want to (d)raw a card or call 'Rats' (r)? ").lower()
-            if action == 'r':
-                self.call_rats()
-                return
-
-        # Player draws a card from the draw pile
-        drawn_card = self.deck.draw()
-        if drawn_card is None:
-            self.end_game()
-            return
-
-        print(f"Drawn card: {drawn_card}")
-
-        # Player chooses to replace or discard the drawn card
-        replace_or_discard = input("Do you want to (r)eplace a card or (d)iscard the drawn card? ").lower()
-        if replace_or_discard == 'r':
-            card_index = int(input("Which card do you want to replace (1, 2, 3)? "))-1
-            self.handle_card_replacement(current_player, card_index, drawn_card)
-        else:
-            self.handle_discard(current_player, drawn_card)
-
-        # Switch to the next player
-        self.turn = (self.turn + 1) % 2
-
-    def handle_card_replacement(self, player, index, drawn_card):
-        discarded = player.replace_card(index, drawn_card)
-        self.discard_pile.append(discarded)
-        if discarded in ['J', 'Q']:
-            self.use_special_power(discarded)
-
-    def handle_discard(self, player, drawn_card):
-        self.discard_pile.append(drawn_card)
-        if drawn_card in ['J', 'Q']:
-            self.use_special_power(drawn_card)
-
-    def use_special_power(self, card_value):
-        if card_value == 'Q':
-            if input("Do you want to swap a card with the opponent? (y/n) ").lower() == "y":
-                self.swap_card()
-
-        elif card_value == 'J':
-            if input("Do you want to peek at any card? (y/n) ").lower() == "y":
-                self.peek_at_card()
-
-    def swap_card(self):
-        current_player = self.players[self.turn]
-        opponent = self.players[(self.turn + 1) % 2]
-        card_to_swap = int(input(f"Which card do you want to swap? (1, 2, 3): "))-1
-        opponent_card_to_swap = int(input(f"Which of your opponent's cards do you want to swap? (1, 2, 3): "))-1
-        temp = current_player.cards[card_to_swap]
-        current_player.cards[card_to_swap] = opponent.cards[opponent_card_to_swap]
-        opponent.cards[opponent_card_to_swap] = temp
-        current_player.revealed_cards[card_to_swap] = None
-        opponent.revealed_cards[opponent_card_to_swap] = None
-
-    def peek_at_card(self):
-        player_to_peek_at = int(input("Peek at your (0) or opponent's (1) card? "))
-        card_index = int(input("Which card (1, 2, 3)? "))-1
-
-        if player_to_peek_at == 0:
-            print(f"Your card: {self.players[self.turn].cards[card_index]}")
-            self.players[self.turn].revealed_cards[card_index] = self.players[self.turn].cards[card_index]  # Reveal card until swapped by a Queen
-        else:
-            print(f"Opponent's card: {self.players[(self.turn + 1) % 2].cards[card_index]}")
-            self.players[self.turn].revealed_cards[card_index] = self.players[(self.turn + 1) % 2].cards[card_index]  # Reveal card until swapped by a Queen
-
-    def call_rats(self):
-        if self.rats_called:
-            print("Rats has already been called.")
-            return
-
-        self.rats_called = True
-        self.rats_caller = self.turn
-        print(f"{self.players[self.turn].name} calls 'Rats'!")
-        self.turn = (self.turn + 1) % 2
-        self.next_turn()
-        self.end_game()
-
-    def end_game(self):
-        self.game_over = True
-        print("\nGame over! Time to reveal the hands.")
-        for player in self.players:
-            print(f"{player.name}'s cards: {player.cards}")
-        self.calculate_scores()
+    def reset_game(self):
+        """Resets the game for a new round (used in training)."""
+        self.deck = Deck()
+        self.discard_pile = []
+        self.turn = 0
+        self.rats_called = False
+        self.game_over = False
+        self.deal_initial_cards()
 
     def get_state(self, player):
-        return (player.get_visible_cards(), self.discard_pile[-1] if self.discard_pile else None)
-    
-    def get_reward(self, player):
-        return -player.get_total_score()
+        """Returns a state representation with the player's own known cards, partial knowledge of opponent's hand, and discard information."""
+        state = []
+
+        # Player's own cards
+        for card in player.get_visible_cards():
+            if card == "K":
+                state.append(0)  # King as 0
+            elif card == "J" or card == "Q":
+                state.append(11)  # Jack and Queen as 11
+            elif card == "?":
+                state.append(-1)  # Hidden card as -1
+            else:
+                state.append(card)  # Numeric card values (1-10)
+
+        # Placeholder for opponent’s cards
+        opponent = self.players[1 - self.turn]
+        for card in opponent.get_visible_cards():
+            if card == "?":
+                state.append(-1)
+            else:
+                state.append(card if player.knows_opponent_card(card) else -1)
+
+        # Additional information: player's current score and remaining deck count
+        state.append(player.get_total_score())  # Player's current score estimate
+        state.append(len(self.deck.cards))      # Remaining cards in the deck
+
+        # Discard pile summary
+        discard_counts = self.get_discard_counts()
+        state.extend(discard_counts)  # Append discard counts to state
+
+        return np.array(state, dtype=np.float32)
+
+    def get_discard_counts(self):
+        """Returns a count of discarded cards as a list of integers."""
+        count = Counter(self.discard_pile)
+        discard_counts = []
+        for value in range(1, 14):  # For values 1 to King (represented as 13)
+            if value == 11:
+                discard_counts.append(count['J'])
+            elif value == 12:
+                discard_counts.append(count['Q'])
+            elif value == 13:
+                discard_counts.append(count['K'])
+            else:
+                discard_counts.append(count[value])
+        return discard_counts
 
     def perform_action(self, player, action):
+        """Handles actions including 'peek' and 'reveal' actions and returns the updated game state, reward, and game-over status."""
+        reward = 0
+
         if action == 'draw':
             drawn_card = self.deck.draw()
             if drawn_card:
                 self.handle_card_replacement(player, 0, drawn_card)
-                new_state = self.get_state(player)
-                reward = self.get_reward(player)
-                return new_state, reward, self.game_over
-        elif action == 'call_rats':
-            self.call_rats()
-            reward = self.get_reward(player)
+                reward += REWARD_FOR_DRAW  # Reward for drawing a new card
             return self.get_state(player), reward, self.game_over
-        return self.get_state(player), 0, self.game_over  
 
-    
-    def calculate_scores(self):
+        elif action == 'call_rats':
+            points = player.get_total_score()
+            opponent_points = self.players[1 - self.turn].get_total_score()
+            game_length = len(self.discard_pile)  # Use discard pile length as game length estimate
+
+            if points < opponent_points:
+                reward += BASE_RATS_REWARD * (REWARD_DECAY_RATE ** game_length)  # Decayed reward
+            elif points > 15:
+                reward += PENALTY_FOR_HIGH_SCORE_RATS  # Penalty for high score when calling "Rats"
+
+            if game_length < MIN_TURN_FOR_RATS:
+                reward += PENALTY_FOR_EARLY_RATS  # Penalty for calling "Rats" too early
+
+            self.call_rats()
+            return self.get_state(player), reward, self.game_over
+
+        elif action == 'peek_opponent':
+            # Player uses a Jack to peek at one of the opponent’s hidden cards
+            opponent = self.players[1 - self.turn]
+            hidden_index = opponent.revealed_cards.index("?")
+            if hidden_index != -1:
+                opponent_card = opponent.cards[hidden_index]
+                player.add_known_opponent_card(opponent_card)
+                reward += 5  # Reward for gaining information about opponent's hand
+            return self.get_state(player), reward, self.game_over
+
+        elif action == 'reveal_with_queen':
+            # Player uses a Queen to give one of their own known cards to the opponent
+            card_to_give = player.cards[0]  # Example: player chooses to give the first card
+            opponent = self.players[1 - self.turn]
+
+            # The giver knows the card, but the receiver does not
+            player.add_known_opponent_card(card_to_give)
+            reward += 5  # Small reward for taking the Queen action
+            return self.get_state(player), reward, self.game_over
+
+    def call_rats(self):
+        """Ends the game when a player calls 'Rats'."""
+        self.rats_called = True
+        self.game_over = True
+        print(f"{self.players[self.turn].name} calls 'Rats'! Game over.")
+        self.end_game()
+
+    def end_game(self):
+        """Calculates scores and determines the winner."""
+        self.game_over = True
+        print("Game over! Final scores:")
         for player in self.players:
-            total = player.get_total_score()
-            print(f"{player.name}'s total score: {total}")
-
-        if self.players[0].get_total_score() < self.players[1].get_total_score():
-            print(f"{self.players[0].name} wins!")
-        elif self.players[0].get_total_score() > self.players[1].get_total_score():
-            print(f"{self.players[1].name} wins!")
-        else:
-            print("It's a tie!")
-
-    def check_game_state(self):
-        # After every turn, check if the game should end (deck empty)
-        if len(self.deck.cards) == 0:
-            self.end_game()
-        else:
-            self.turn = (self.turn + 1) % 2  # Switch turns
+            print(f"{player.name}: {player.get_total_score()} points")
