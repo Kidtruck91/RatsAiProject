@@ -143,7 +143,7 @@ class Game:
         return discard_counts
 
     def perform_action(self, player, action):
-        """Handles actions including 'peek' and 'reveal' actions and returns the updated game state, reward, and game-over status."""
+        """Handles actions and returns the updated game state, reward, and game-over status."""
         reward = 0
 
         if action == 'draw':
@@ -179,15 +179,26 @@ class Game:
                 reward += 5  # Reward for gaining information about opponent's hand
             return self.get_state(player), reward, self.game_over
 
-        elif action == 'reveal_with_queen':
-            # Player uses a Queen to give one of their own known cards to the opponent
-            card_to_give = player.cards[0]  # Example: player chooses to give the first card
-            opponent = self.players[1 - self.turn]
-
-            # The giver knows the card, but the receiver does not
-            player.add_known_opponent_card(card_to_give)
-            reward += 5  # Small reward for taking the Queen action
+        elif action == 'peek_self':
+            # Player uses a Jack to peek at one of their own hidden cards
+            hidden_index = player.revealed_cards.index("?")
+            if hidden_index != -1:
+                card = player.cards[hidden_index]
+                player.add_known_card(card)
+                reward += 5  # Reward for self-inspection
             return self.get_state(player), reward, self.game_over
+
+        elif action == 'swap_with_queen':
+            # Player uses a Queen to swap one of their own known cards with an opponent's
+            card_to_swap = player.cards[0]  # Example: player chooses to swap the first card
+            opponent = self.players[1 - self.turn]
+            opponent_card = opponent.cards[0]  # Example: opponent's first card
+
+            # Execute the swap between players
+            player.cards[0], opponent.cards[0] = opponent_card, card_to_swap
+            reward += 5  # Reward for taking the Queen action
+            return self.get_state(player), reward, self.game_over
+
 
     def call_rats(self):
         """Ends the game when a player calls 'Rats'."""
