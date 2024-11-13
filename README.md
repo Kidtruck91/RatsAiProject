@@ -19,6 +19,7 @@ DQN Agent Parameters:
 LEARNING_RATE: Learning rate for the DQN model.
 DISCOUNT_FACTOR: Discount factor for future rewards.
 EXPLORATION_RATE, EXPLORATION_DECAY, MIN_EXPLORATION_RATE: Parameters for balancing exploration and exploitation.
+
 2. game_logic.py
 Purpose: Contains the logic for the Rats game, managing game state, actions, rewards, and penalties for player moves. This file orchestrates each player's turn and handles specific actions like drawing and calling "Rats."
 
@@ -36,6 +37,7 @@ Player: Represents each player in the game, tracking known cards, scores, and ac
 
 get_visible_cards(self): Returns the cards visible to the player.
 get_total_score(self): Calculates the total score of the player's hand.
+
 3. q_learning_agent.py
 Purpose: Defines the DQNAgent class, which represents the Deep Q-Learning agent. This file handles the neural network structure, memory replay, and exploration/exploitation strategy.
 
@@ -49,6 +51,7 @@ train_from_replay(self, batch_size=32): Trains the model from past experiences s
 update_target_network(self): Updates the target network with the current model weights.
 remember(self, state, action, reward, next_state, done): Stores experiences for replay.
 save(self, name) and load(self, name): Save and load model weights for persistence.
+
 4. Trainer.py
 Purpose: Orchestrates the training loop, initializes agents, and manages metrics for performance analysis. This script uses parameters from config.py to control training dynamics and save results.
 
