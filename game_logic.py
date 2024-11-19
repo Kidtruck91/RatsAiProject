@@ -124,7 +124,7 @@ class Game:
                 elif card in ["J", "Q"]:
                     state.append(11)
                 else:
-                state.append(-1)  # Default if unexpected
+                    state.append(-1)  # Default if unexpected
             else:
                 state.append(float(card))  # Numeric card values (1-10)
 
