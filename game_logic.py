@@ -111,12 +111,22 @@ class Game:
             elif not revealed:
                 state.append(-1)  # Unknown card
             else:
-                state.append(card)  # Numeric card values (1-10)
+                state.append(float(card))  # Numeric card values (1-10)
 
         # Opponent's visible cards
         opponent = self.players[1 - self.turn]
         for card in opponent.get_visible_cards():
-            state.append(card if player.knows_opponent_card(card) else -1)
+            if card == "?":
+                state.append(-1)
+            elif isinstance(card, str):  # Convert face cards for opponent
+                if card == "K":
+                    state.append(0)
+                elif card in ["J", "Q"]:
+                    state.append(11)
+                else:
+                state.append(-1)  # Default if unexpected
+            else:
+                state.append(float(card))  # Numeric card values (1-10)
 
         # Additional game information
         state.append(player.get_total_score())  # Player's score
@@ -127,6 +137,7 @@ class Game:
         state.extend(discard_counts)
 
         return np.array(state, dtype=np.float32)
+
 
     def get_discard_counts(self):
         count = Counter(self.discard_pile)
