@@ -2,8 +2,10 @@ from tkinter import *
 from PIL import Image, ImageTk
 from game_logic import Game, Player
 from q_learning_agent import DQNAgent
-import random
+from GuiRes import CARD_IMAGES
+import os
 
+# Initialize Tkinter window
 root = Tk()
 root.title("Rats!")
 root.geometry("900x500")
@@ -14,54 +16,87 @@ player1 = Player("Player 1")
 player2 = Player("AI Player")
 game = Game(player1, player2)
 
+# Initialize agents
 agent1 = DQNAgent(21, 5)
 agent2 = DQNAgent(21, 5)
 
-# Load AI weights
-agent1.load("/Users/kishanbhagwandas/Downloads/RatsAiProject-main-2/weights/dqn_weights_player1.weights.h5")
-agent2.load("/Users/kishanbhagwandas/Downloads/RatsAiProject-main-2/weights/dqn_weights_player2.weights.h5")
+# Load AI weights from the weights folder
+weights_dir = "./weights"
+agent1.load(os.path.join(weights_dir, "dqn_weights_player1.weights.h5"))
+agent2.load(os.path.join(weights_dir, "dqn_weights_player2.weights.h5"))
 
 # Resize card images
 def resize_cards(card_path):
-    card_img = Image.open("/Users/kishanbhagwandas/Downloads/RatsAiProject-main-2/cards")
-    resized_image = card_img.resize((150, 218))
-    return ImageTk.PhotoImage(resized_image)
+    """
+    Resize a card image to fit the display size.
+    :param card_path: Path to the card image file.
+    :return: Resized card image as a PhotoImage object.
+    """
+    try:
+        card_img = Image.open(card_path)
+        resized_image = card_img.resize((150, 218))  # Adjust size as needed
+        return ImageTk.PhotoImage(resized_image)
+    except FileNotFoundError:
+        print(f"Card image not found: {card_path}")
+        return None
 
 # Card display variables
-player_card_label = None
-ai_card_label = None
+player_card_labels = []
+ai_card_labels = []
 
 def update_cards():
-    global player_card_label, ai_card_label
+    """
+    Update card displays for both players.
+    """
+    # Clear old labels
+    for label in player_card_labels:
+        label.destroy()
+    for label in ai_card_labels:
+        label.destroy()
 
     # Display Player 1 cards
-    if player1.get_visible_cards():
-        card_path = f"/Users/kishanbhagwandas/Downloads/RatsAiProject-main-2/cards{player1.get_visible_cards()[-1]}.png"
-        player_card_image = resize_cards(card_path)
-        player_card_label.config(image=player_card_image)
-        player_card_label.image = player_card_image
+    for i, card in enumerate(player1.get_visible_cards()):
+        card_path = CARD_IMAGES.get(card, "./cards/default.png")
+        card_image = resize_cards(card_path)
+        if card_image:
+            card_label = Label(player_frame, image=card_image, bg="green")
+            card_label.image = card_image
+            card_label.grid(row=0, column=i)
+            player_card_labels.append(card_label)
 
     # Display AI Player cards
-    if player2.get_visible_cards():
-        card_path = f"/Users/kishanbhagwandas/Downloads/RatsAiProject-main-2/cards{player2.get_visible_cards()[-1]}.png"
-        ai_card_image = resize_cards(card_path)
-        ai_card_label.config(image=ai_card_image)
-        ai_card_label.image = ai_card_image
+    for i, card in enumerate(player2.get_visible_cards()):
+        card_path = CARD_IMAGES.get(card, "./cards/default.png")
+        card_image = resize_cards(card_path)
+        if card_image:
+            card_label = Label(ai_frame, image=card_image, bg="green")
+            card_label.image = card_image
+            card_label.grid(row=0, column=i)
+            ai_card_labels.append(card_label)
 
 def ai_turn(player, agent):
+    """
+    Handle AI player's turn.
+    """
     state = game.get_state(player)
     action = agent.choose_action(state)
     game.perform_action(player, ['draw', 'call_rats', 'peek_opponent', 'peek_self', 'swap_with_queen'][action])
     update_cards()
 
 def human_turn(player):
+    """
+    Handle Human player's turn.
+    """
     state = game.get_state(player)
     print(f"Your cards: {player.get_visible_cards()}")
-    action = input("Choose an action (draw, call_rats, peek_opponent, peek_self, swap_with_queen): ").strip()
+    action = input("Choose an action (draw, call_rats, peek_opponent, peek_self, swap_with_queen): ").strip().lower()
     game.perform_action(player, action)
     update_cards()
 
 def run_game(mode):
+    """
+    Start the game in the selected mode.
+    """
     game.reset_game()
     update_cards()
     if mode == 1:  # AI vs AI
@@ -84,27 +119,21 @@ def run_game(mode):
 frame = Frame(root, bg="green")
 frame.pack(pady=20)
 
-player_frame = LabelFrame(frame, text="Player 1", bd=0)
+player_frame = LabelFrame(frame, text="Player 1", bd=0, bg="green", fg="white", font=("Helvetica", 14))
 player_frame.grid(row=0, column=0, padx=20)
 
-ai_frame = LabelFrame(frame, text="AI Player", bd=0)
+ai_frame = LabelFrame(frame, text="AI Player", bd=0, bg="green", fg="white", font=("Helvetica", 14))
 ai_frame.grid(row=0, column=1, padx=20)
-
-# Labels for cards
-player_card_label = Label(player_frame, text='', bg="green")
-player_card_label.pack(pady=20)
-
-ai_card_label = Label(ai_frame, text='', bg="green")
-ai_card_label.pack(pady=20)
 
 # Buttons
 def start_human_vs_ai():
     run_game(2)
 
-shuffle_button = Button(root, text="Start Human vs AI", font=("Helvetica", 14), command=start_human_vs_ai)
-shuffle_button.pack(pady=20)
+start_button = Button(root, text="Start Human vs AI", font=("Helvetica", 14), command=start_human_vs_ai)
+start_button.pack(pady=20)
 
 # Initialize card display
 update_cards()
 
+# Start Tkinter main loop
 root.mainloop()
