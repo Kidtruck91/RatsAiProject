@@ -1,67 +1,99 @@
-# RatsAiProject
-Project Structure
-1. config.py
-Purpose: Holds all configurable parameters that influence agent behavior, rewards, penalties, and training settings. By adjusting values here, you can influence the agent's strategies and outcomes without modifying other files.
+RatsAiProject
+==============
 
-Key Parameters:
+This project implements a deep reinforcement learning AI for the card game **Rats**. It uses Deep Q-Learning (DQN) to train agents to compete in the game.
 
-EPISODES: Total number of training episodes.
-BATCH_SIZE: The size of memory replay batches.
-STATE_SIZE and ACTION_SIZE: Define the state and action space for the DQN agent.
-Reward and Penalty Parameters:
-REWARD_FOR_DRAW: Reward for drawing a card to extend the game.
-BASE_RATS_REWARD: Base reward for calling "Rats" when likely to win.
-PENALTY_FOR_EARLY_RATS: Penalty for calling "Rats" too early.
-MIN_TURN_FOR_RATS: Minimum number of turns before calling "Rats" without penalty.
-REWARD_DECAY_RATE: Decay rate for rewards when calling "Rats" based on game length.
-PENALTY_FOR_HIGH_SCORE_RATS: Penalty for calling "Rats" with a high score.
-DQN Agent Parameters:
-LEARNING_RATE: Learning rate for the DQN model.
-DISCOUNT_FACTOR: Discount factor for future rewards.
-EXPLORATION_RATE, EXPLORATION_DECAY, MIN_EXPLORATION_RATE: Parameters for balancing exploration and exploitation.
+Environment Setup
+-----------------
+To run this project, you need to set up your Python environment with the required packages. Follow these steps:
 
-2. game_logic.py
-Purpose: Contains the logic for the Rats game, managing game state, actions, rewards, and penalties for player moves. This file orchestrates each player's turn and handles specific actions like drawing and calling "Rats."
+### Prerequisites
+1. **Python**: Make sure Python 3.8 or higher is installed.
 
-Key Classes and Functions:
+2. **Install Required Packages**: Use `pip` to install the necessary libraries. Run the following command in your terminal:
+pip install numpy tensorflow keras
 
-Game: The main class that manages game state, actions, and rewards.
+### Directory Structure
+Ensure your project directory looks like this:
+RatsAiProject/  
+Trainer.py 
+Rats.py
+game_logic.py
+q_learning_agent.py 
+config.py 
+weights/
 
-__init__(self, player1, player2): Initializes the game with two players.
-deal_initial_cards(self): Deals initial cards to each player.
-reset_game(self): Resets the game for a new round.
-get_state(self, player): Returns the current state for a player, including visible cards and discard counts.
-perform_action(self, player, action): Executes an action (draw, call_rats, etc.) and returns the updated game state, reward, and game-over status.
-call_rats(self): Ends the game when a player calls "Rats" and calculates the final score.
-Player: Represents each player in the game, tracking known cards, scores, and actions.
+### Notes:
+- Create a folder named `weights` in the project directory if it doesn't already exist. This is where model weights will be saved.
 
-get_visible_cards(self): Returns the cards visible to the player.
-get_total_score(self): Calculates the total score of the player's hand.
+Running the Project
+-------------------
+### Step 1: Train the AI (Trainer.py)
+First, train the AI agents by running the `Trainer.py` file. This step initializes the game environment and uses DQN to train two AI agents to compete against each other.
 
-3. q_learning_agent.py
-Purpose: Defines the DQNAgent class, which represents the Deep Q-Learning agent. This file handles the neural network structure, memory replay, and exploration/exploitation strategy.
+python Trainer.py
+Output:
+The script will display the training progress, including metrics like:
+Victory percentages for both agents.
+Average game length.
+Number of "Rats" calls by each agent.
+Once training is complete, model weights will be saved in the weights directory.
+Step 2: Play the Game (Rats.py)
+After training, you can simulate or play games using Rats.py. The script provides options for:
 
-Key Functions and Methods:
+AI vs AI
+Player vs AI
+AI vs Player
+Run the script:
+python Rats.py
 
-DQNAgent: Defines the DQN agent and its training strategy.
-__init__(self, state_size, action_size, ...): Initializes agent parameters such as learning rate, discount factor, and exploration decay.
-build_model(self): Builds the neural network model for Q-learning, consisting of two hidden layers.
-choose_action(self, state): Selects an action based on the current exploration rate or Q-values.
-train_from_replay(self, batch_size=32): Trains the model from past experiences stored in memory.
-update_target_network(self): Updates the target network with the current model weights.
-remember(self, state, action, reward, next_state, done): Stores experiences for replay.
-save(self, name) and load(self, name): Save and load model weights for persistence.
+Gameplay Options:
 
-4. Trainer.py
-Purpose: Orchestrates the training loop, initializes agents, and manages metrics for performance analysis. This script uses parameters from config.py to control training dynamics and save results.
+Follow the on-screen prompts to choose the game mode and take actions during the game.
+##File Descriptions
+1. Trainer.py
+Trains two AI agents using Deep Q-Learning.
+Saves trained weights in the weights folder.
+2. Rats.py
+Runs the game using the trained AI models or lets a human player interact with the game.
+3. game_logic.py
+Contains the mechanics of the game:
+Drawing cards.
+Calling "Rats."
+Managing hands, discards, and scoring.
+4. q_learning_agent.py
+Implements the DQN agent:
+Neural network structure.
+Replay memory.
+Exploration vs exploitation strategy.
+5. config.py
+Stores configuration for:
+Rewards and penalties.
+Hyperparameters for DQN training (e.g., learning rate, discount factor, exploration rate).
+6. weights/
+Stores the saved weights of the trained models.
 
-Key Functions and Main Workflow:
+Troubleshooting
+Model Weight Shape Mismatch:
 
-train_dqn(episodes=1000): Main function that runs the training loop for a specified number of episodes.
-Initializes two Player instances and the Game.
-Creates two DQNAgent instances (agent1 for Player 1 and agent2 for Player 2) with parameters from config.py.
-Executes each player's actions in alternating turns until the game is over.
-Records victories, ties, and game length for each episode.
-Trains each agent on past experiences using experience replay.
-Prints summary metrics at the end of training, including victory percentages and average game length.
-Saves both agents’ weights after training for future use.
+If you encounter an error while loading model weights (e.g., shape mismatch), delete the existing weights in the weights directory and re-train the models using Trainer.py.
+
+Game Crashing or Logic Issues:
+
+Check for errors in game_logic.py, especially in the perform_action method.
+
+Missing Dependencies:
+
+Ensure all required Python packages are installed by running:
+pip install numpy tensorflow keras
+
+Future Enhancements
+Improved AI Logic: Adjust rewards and penalties to enhance strategy.
+Performance Tracking: Log gameplay data for more insights into AI performance.
+GUI Support: Build a graphical interface for better user experience.
+Enjoy exploring AI strategies for the game Rats! 🚀 """
+
+Save to a .txt file
+readme_path = "/mnt/data/RatsAiProject_README.txt" with open(readme_path, "w") as file: file.write(readme_content)
+
+readme_path
