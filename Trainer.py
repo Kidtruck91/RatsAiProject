@@ -3,10 +3,9 @@ from game_logic import Game, Player
 from q_learning_agent import DQNAgent
 from config import *
 
-
 def train_dqn():
-    player1 = Player("AI_Player1")
-    player2 = Player("AI_Player2")
+    player1 = Player("AI_Player1", is_human=False)
+    player2 = Player("AI_Player2", is_human=False)
     game = Game(player1, player2)
 
     agent1 = DQNAgent(STATE_SIZE, ACTION_SIZE, LEARNING_RATE, DISCOUNT_FACTOR, EXPLORATION_RATE, EXPLORATION_DECAY, MIN_EXPLORATION_RATE)
@@ -29,21 +28,29 @@ def train_dqn():
 
         while not game.game_over:
             # AI1's turn
-            action1 = agent1.choose_action(state1)
-            _, reward1, _ = game.perform_action(player1, ['draw', 'call_rats', 'peek_opponent', 'peek_self', 'swap_with_queen'][action1])
-            state1 = game.get_state(player1)
-            agent1.remember(state1, action1, reward1, game.get_state(player1), game.game_over)
-            if action1 == 1: metrics["rats_calls_player1"] += 1
+            valid_actions1 = game.get_available_actions()  # Get valid actions for Player 1
+            action1 = agent1.choose_action(state1, valid_actions1)
+            action1_name = valid_actions1[action1]  # Get the corresponding action name
+            reward1 = game.perform_action(player1, action1_name, agent1)  # Pass agent1 to perform_action
+            next_state1 = game.get_state(player1)
+            agent1.remember(state1, action1, reward1, next_state1, game.game_over)
+            state1 = next_state1
+            if action1_name == "call_rats": 
+                metrics["rats_calls_player1"] += 1
 
             if game.game_over:
                 break
 
             # AI2's turn
-            action2 = agent2.choose_action(state2)
-            _, reward2, _ = game.perform_action(player2, ['draw', 'call_rats', 'peek_opponent', 'peek_self', 'swap_with_queen'][action2])
-            state2 = game.get_state(player2)
-            agent2.remember(state2, action2, reward2, game.get_state(player2), game.game_over)
-            if action2 == 1: metrics["rats_calls_player2"] += 1
+            valid_actions2 = game.get_available_actions()  # Get valid actions for Player 2
+            action2 = agent2.choose_action(state2, valid_actions2)
+            action2_name = valid_actions2[action2]  # Get the corresponding action name
+            reward2 = game.perform_action(player2, action2_name, agent2)  # Pass agent2 to perform_action
+            next_state2 = game.get_state(player2)
+            agent2.remember(state2, action2, reward2, next_state2, game.game_over)
+            state2 = next_state2
+            if action2_name == "call_rats": 
+                metrics["rats_calls_player2"] += 1
 
             game_length += 1
 
@@ -61,7 +68,8 @@ def train_dqn():
     # Save results and weights
     agent1.save("./weights/dqn_weights_player1.weights.h5")
     agent2.save("./weights/dqn_weights_player2.weights.h5")
-    print(metrics)
+    print("Training Complete!")
+    print("Metrics:", metrics)
 
 if __name__ == "__main__":
     train_dqn()

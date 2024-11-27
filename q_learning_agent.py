@@ -4,6 +4,15 @@ from collections import deque
 import tensorflow as tf
 from tensorflow import keras
 
+# Swap action mappings
+SWAP_ACTIONS = {
+    "give_0": 0,  # Give card at index 0
+    "give_1": 1,  # Give card at index 1
+    "give_2": 2,  # Give card at index 2
+    "take_0": 3,  # Take card at index 0
+    "take_1": 4,  # Take card at index 1
+    "take_2": 5,  # Take card at index 2
+}
 class DQNAgent:
     def __init__(self, state_size, action_size, learning_rate=0.001, discount_factor=0.95, exploration_rate=1.0, exploration_decay=0.995, min_exploration_rate=0.01):
         self.state_size = state_size
@@ -33,12 +42,25 @@ class DQNAgent:
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
-    def choose_action(self, state):
+    def choose_action(self, state, valid_actions):
+        """
+        Select an action based on Q-values, constrained to valid actions.
+        """
         if np.random.rand() <= self.exploration_rate:
-            return random.randrange(self.action_size)
+            # Choose a random action from valid actions
+            return random.choice(range(len(valid_actions)))
+    
         state = np.reshape(state, [1, self.state_size])
-        q_values = self.model.predict(state)
-        return np.argmax(q_values[0])
+        q_values = self.model.predict(state)[0]
+
+        # Filter Q-values to only consider valid actions
+        valid_q_values = [q_values[action] for action in range(len(q_values)) if action in valid_actions]
+
+        # Map back to original index for the valid actions
+        valid_action_indices = [action for action in range(len(q_values)) if action in valid_actions]
+
+        return valid_action_indices[np.argmax(valid_q_values)]
+
 
     def train_from_replay(self, batch_size=32):
         if len(self.memory) < batch_size:
