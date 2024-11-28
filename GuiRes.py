@@ -8,15 +8,26 @@ CARDS_DIR = os.path.join(BASE_DIR, "cards")
 CARD_IMAGES = {
     1: os.path.join(CARDS_DIR, "14_of_clubs.png"),
     2: os.path.join(CARDS_DIR, "2_of_clubs.png"),
-    # ... Other card images ...
+    3: os.path.join(CARDS_DIR, "3_of_clubs.png"),
+    4: os.path.join(CARDS_DIR, "4_of_clubs.png"),
+    5: os.path.join(CARDS_DIR, "5_of_clubs.png"),
+    6: os.path.join(CARDS_DIR, "6_of_clubs.png"),
+    7: os.path.join(CARDS_DIR, "7_of_clubs.png"),
+    8: os.path.join(CARDS_DIR, "8_of_clubs.png"),
+    9: os.path.join(CARDS_DIR, "9_of_clubs.png"),
+    10: os.path.join(CARDS_DIR, "10_of_clubs.png"),
+    "J": os.path.join(CARDS_DIR, "11_of_clubs.png"),
+    "Q": os.path.join(CARDS_DIR, "12_of_clubs.png"),
+    "K": os.path.join(CARDS_DIR, "13_of_clubs.png"),
     "?": os.path.join(CARDS_DIR, "default.png"),
 }
 
 
 class RatsGameGUI:
-    def __init__(self, root, game):
+    def __init__(self, root, game,player1, player2):
         self.root = root
         self.game = game
+        self.xray_mode=False
         self.player1 = game.players[0]
         self.player2 = game.players[1]
         self.drawn_card = None  # Tracks the most recently drawn card
@@ -85,7 +96,7 @@ class RatsGameGUI:
     def update_gui(self):
         # Update player and opponent hands
         for i, (label, button) in enumerate(self.select_buttons):
-            card_value = self.player1.cards[i] if self.game.xray_mode else "?"
+            card_value = self.player1.cards[i] if self.xray_mode else "?"
             label.config(image=self.card_images[card_value])
 
         # Update draw and discard piles
@@ -116,8 +127,8 @@ class RatsGameGUI:
         self.update_gui()
 
     def toggle_xray_mode(self):
-        self.game.xray_mode = not self.game.xray_mode
-        self.update_gui()
+        self.xray_mode = not self.xray_mode
+        self.update_gui()  # Refresh the display
 
     def append_status(self, message):
         self.status_text.config(state="normal")
