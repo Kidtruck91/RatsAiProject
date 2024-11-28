@@ -29,10 +29,15 @@ class Game:
         """Reset the game to its initial state."""
         self.deck = Deck()
         self.discard_pile = []
+        self.last_discard = None
+        self.special_action_available = False
         self.turn = 0
+        self.rats_caller = None
         self.rats_called = False
         self.final_turn = False
+        self.last_action = None
         self.game_over = False
+        self.turn_counter = 0  # Reset turn counter
         self.deal_initial_cards()
 
     def get_state(self, player):
