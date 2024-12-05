@@ -27,6 +27,10 @@ def train_dqn():
         "turn_counters": [],  # Track turn counts for each game
         "rats_calls_player1": 0,
         "rats_calls_player2": 0,
+        "peeks_player1": 0,
+        "peeks_player2": 0,
+        "swaps_player1": 0,
+        "swaps_player2": 0,
         "average_score_player1": [],
         "average_score_player2": [],
     }
@@ -42,9 +46,17 @@ def train_dqn():
             valid_actions1 = game.get_available_actions()
             action1 = agent1.choose_action(state1, valid_actions1)
             action1_name = valid_actions1[action1]
-            reward1, _ = process_action(game, player1, action1_name, agent1)
-            if action1_name == "rats":
+            reward1, state_log1 = process_action(game, player1, action1_name, agent1)
+
+            # Update metrics based on executed action
+            executed_action1 = state_log1["action"]
+            print(f"AI_Player1 executed action: {executed_action1}")
+            if executed_action1 == "call_rats":
                 metrics["rats_calls_player1"] += 1
+            elif executed_action1 in ["peek"]:
+                metrics["peeks_player1"] += 1
+            elif executed_action1 == "swap":
+                metrics["swaps_player1"] += 1
 
             if game.game_over:
                 break
@@ -53,9 +65,17 @@ def train_dqn():
             valid_actions2 = game.get_available_actions()
             action2 = agent2.choose_action(state2, valid_actions2)
             action2_name = valid_actions2[action2]
-            reward2, _ = process_action(game, player2, action2_name, agent2)
-            if action2_name == "rats":
+            reward2, state_log2 = process_action(game, player2, action2_name, agent2)
+
+            # Update metrics based on executed action
+            executed_action2 = state_log2["action"]
+            print(f"AI_Player2 executed action: {executed_action2}")
+            if executed_action2 == "call_rats":
                 metrics["rats_calls_player2"] += 1
+            elif executed_action2 in ["peek_self", "peek_opponent"]:
+                metrics["peeks_player2"] += 1
+            elif executed_action2 == "swap_with_queen":
+                metrics["swaps_player2"] += 1
 
             game_length += 1
 
@@ -85,6 +105,10 @@ def train_dqn():
         "average_turns": np.mean(metrics["turn_counters"]),
         "rats_calls_player1": metrics["rats_calls_player1"],
         "rats_calls_player2": metrics["rats_calls_player2"],
+        "peeks_player1": metrics["peeks_player1"],
+        "peeks_player2": metrics["peeks_player2"],
+        "swaps_player1": metrics["swaps_player1"],
+        "swaps_player2": metrics["swaps_player2"],
         "average_score_player1": np.mean(metrics["average_score_player1"]),
         "average_score_player2": np.mean(metrics["average_score_player2"]),
     }
@@ -103,10 +127,11 @@ def process_action(game, player, action_name, agent):
     """
     Perform an action, log state information, and return the reward and state log.
     """
-    state_before, reward, next_state = game.perform_action(player, action_name, agent)
+    state_before, reward, next_state, executed_action = game.perform_action(player, action_name, agent)
+    print(f"process_action: {player.name} executed {executed_action}") 
     state_log = {
         "player": player.name,
-        "action": action_name,
+        "action": executed_action,  # Use the executed action for logging
         "state": state_before.tolist(),
         "valid_actions": game.get_available_actions(),
         "reward": reward,
@@ -114,7 +139,6 @@ def process_action(game, player, action_name, agent):
         "scores": [p.get_total_score() for p in game.players]
     }
     return reward, state_log
-
 
 if __name__ == "__main__":
     train_dqn()

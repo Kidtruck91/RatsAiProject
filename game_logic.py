@@ -130,8 +130,9 @@ class Game:
 
         # Default actions at the start of a turn
         if self.last_action is None or self.last_action in ["discard", "call_rats"]:
-            actions = ["draw", "call_rats"]
-
+            actions = ["draw"]
+            if not self.rats_called:  # All
+                actions.append("call_rats")
         # Special actions based on last discard
         if self.last_discard == "J" and self.special_action_available and self.special_action_owner == self.players[self.turn].name:
             actions = ["peek_self", "peek_opponent"]
@@ -165,12 +166,30 @@ class Game:
         if self.rats_caller and self.players[self.turn].name == self.rats_caller:
             print(f"{self.players[self.turn].name} has completed their final turn. Ending the game.")
             self.end_game()
-            return state_before_action, reward, None
+            return state_before_action, reward, self.get_state(player), action
         elif action == "draw":
             if player.is_human:
                 self.draw_human(player)
             else:
                 reward+=self.draw_ai(player, agent)
+        elif action == "peek_self":
+            print(f"{player.name} executed peek_self.")
+            if player.is_human:
+                self.peek_self(player)
+            else:
+                reward += self.peek_self_ai(player, agent)
+        elif action == "peek_opponent":
+            print(f"{player.name} executed peek_opponent.")
+            if player.is_human:
+                self.peek_opponent(player)
+            else:
+                reward += self.peek_opponent_ai(player, agent)
+        elif action == "swap_with_queen":
+            print(f"{player.name} executed swap.")
+            if player.is_human:
+                self.swap_with_queen_human(player)
+            else:
+                reward += self.swap_with_queen_ai(player, agent)
         elif action == "call_rats":
             points = player.get_total_score()
             opponent_points = self.players[1 - self.turn].get_total_score()
@@ -181,7 +200,7 @@ class Game:
             elif points >= opponent_points:  # Discourage calling when losing or very close
                 reward += PENALTY_FOR_CALL_WHILE_BEHIND
             # Penalize high scores (bad hands)
-            if points > 15:
+            if points > 10:
                 reward += PENALTY_FOR_HIGH_SCORE_RATS
 
             # Penalize early turns (alternative to deck-based penalty)
@@ -191,72 +210,73 @@ class Game:
             self.call_rats()
         
         self.advance_turn()
-        print(f"EndingPerform action")
+        print(f"Ending Perform action")
         # Capture the next state after the action
         next_state = self.get_state(player)
 
         # Return state, reward, and next state
-        return state_before_action, reward, next_state
+        return state_before_action, reward, next_state,action
 
 
     def draw_ai(self, player, agent):
-            """
-            AI logic for drawing a card and making a decision about replacement or discarding.
-            """
-            # Attempt to draw a card from the deck
-            drawn_card = self.deck.draw()
-            if not drawn_card:
-                print(f"{player.name} cannot draw because the deck is empty.")
-                return  # No further actions if the deck is empty
+        """
+        AI logic for drawing a card and making a decision about replacement or discarding.
+        Special actions (peeking or swapping) are routed through perform_action.
+        """
+        # Attempt to draw a card from the deck
+        drawn_card = self.deck.draw()
+        if not drawn_card:
+            print(f"{player.name} cannot draw because the deck is empty.")
+            return 0  # No reward if the deck is empty
 
-            print(f"{player.name} drew: {drawn_card}")
+        print(f"{player.name} drew: {drawn_card}")
 
-            # Get the current state and valid actions for decision-making
-            state = self.get_state(player)
-            valid_actions = ["replace_0", "replace_1", "replace_2", "discard"]
+        # Get the current state and valid actions for decision-making
+        state = self.get_state(player)
+        valid_actions = ["replace_0", "replace_1", "replace_2", "discard"]
 
-            # AI chooses an action based on state and valid actions
-            action_index = agent.choose_action(state, valid_actions)
-            action = valid_actions[action_index]
+        # AI chooses an action based on state and valid actions
+        action_index = agent.choose_action(state, valid_actions)
+        action = valid_actions[action_index]
 
-            # Perform the chosen action
-            if action == "discard":
-                self.discard_pile.append(drawn_card)
-                print(f"{player.name} discarded: {drawn_card}")
+        # Perform the chosen action
+        if action == "discard":
+            self.discard_pile.append(drawn_card)
+            self.last_discard = drawn_card
+            print(f"{player.name} discarded: {drawn_card}")
+        else:
+            replace_index = int(action.split("_")[1])  # Extract index from "replace_X"
+            self.handle_card_replacement(player, replace_index, drawn_card)
 
-                # Optionally reward for discarding (e.g., prolonging the game)
-                reward = REWARD_FOR_DRAW  # Adjust reward logic as needed
-            else:
-                replace_index = int(action.split("_")[1])  # Extract index from "replace_X"
-                self.handle_card_replacement(player, replace_index, drawn_card)
+        reward = REWARD_FOR_DRAW  # Adjust reward logic if necessary
 
-                # Reward based on improvement of the hand (optional logic)
-                reward = REWARD_FOR_DRAW  # Adjust reward logic if necessary
-            if self.special_action_available and self.special_action_owner == player.name:
-                if self.last_discard == "J":
-                    hidden_indices = [i for i, revealed in enumerate(self.players[1 - self.turn].revealed_cards) if not revealed]
-                    valid_peek_actions = ["peek_self", "peek_opponent"] if hidden_indices else ["peek_self"]
-                    special_action_index = agent.choose_action(state, valid_peek_actions)
-                    special_action = valid_peek_actions[special_action_index]
+        # Handle special actions (peeking or swapping) if triggered
+        if self.special_action_available and self.special_action_owner == player.name:
+            special_actions = []
+            if self.last_discard == "J":
+                special_actions = ["peek_self", "peek_opponent"]
+            elif self.last_discard == "Q":
+                special_actions = ["swap_with_queen"]
 
-                    if special_action == "peek_self":
-                        reward += self.peek_self_ai(player, agent)
-                    elif special_action == "peek_opponent":
-                        reward += self.peek_opponent_ai(player, agent)
+            if special_actions:
+                special_action_index = agent.choose_action(state, special_actions)
+                special_action = special_actions[special_action_index]
 
-                elif self.last_discard == "Q":
-                    reward += self.swap_with_queen_ai(player, agent)
+                # Route special actions through perform_action
+                _, special_action_reward, _, _ = self.perform_action(player, special_action, agent)
+                reward += special_action_reward
 
-            # Clear the special action flags after use
-            self.special_action_available = False
-            self.special_action_owner = None
-                   
-            # Update AI's memory for reinforcement learning
-            next_state = self.get_state(player)  # State after the action
-            agent.remember(state, action_index, reward, next_state, False)
-            return reward
+    # Clear the special action flags after use
+        self.special_action_available = False
+        self.special_action_owner = None
+
+        return reward
 
     def draw_human(self, player):
+        """
+        Human logic for drawing a card and making a decision about replacement or discarding.
+        Special actions (peeking or swapping) are routed through perform_action.
+        """
         drawn_card = self.deck.draw()
         if not drawn_card:
             print("Deck is empty. Cannot draw.")
@@ -267,11 +287,11 @@ class Game:
             try:
                 replace_index = int(input("Choose which card to replace (0, 1, 2) or -1 to discard: "))
                 if replace_index == -1:
-                    # Call handle_card_replacement to process discard
+                    # Discard the drawn card
                     self.handle_card_replacement(player, -1, drawn_card)
                     break
                 elif 0 <= replace_index < len(player.cards):
-                    # Call handle_card_replacement to process replacement
+                    # Replace the card in the player's hand
                     self.handle_card_replacement(player, replace_index, drawn_card)
                     break
                 else:
@@ -279,25 +299,26 @@ class Game:
             except ValueError:
                 print("Invalid input. Please enter a number.")
 
-        # Trigger special actions if available
+        # Handle special actions (peeking or swapping) if triggered
         if self.special_action_available and self.special_action_owner == player.name:
+            special_actions = []
             if self.last_discard == "J":
+                special_actions = ["peek_self", "peek_opponent"]
+            elif self.last_discard == "Q":
+                special_actions = ["swap_with_queen"]
+
+            if special_actions:
                 while True:
-                    print("Special action available: Peek.")
-                    choice = input("Would you like to 'peek_self' or 'peek_opponent'? (type 'skip' to skip): ").strip().lower()
-                    if choice == "peek_self":
-                        self.peek_self(player)
-                        break
-                    elif choice == "peek_opponent":
-                        self.peek_opponent(player)
+                    print(f"Special action available: {special_actions}.")
+                    choice = input(f"Type one of the following: {special_actions} or 'skip': ").strip().lower()
+                    if choice in special_actions:
+                        self.perform_action(player, choice)
                         break
                     elif choice == "skip":
                         print("Skipping special action.")
                         break
                     else:
-                        print("Invalid choice. Please type 'peek_self', 'peek_opponent', or 'skip'.")
-            elif self.last_discard == "Q":
-                self.swap_with_queen_human(player)
+                        print(f"Invalid choice. Please type one of {special_actions} or 'skip'.")
 
         # Clear the special action flags after use
         self.special_action_available = False
@@ -330,7 +351,7 @@ class Game:
 
             # Assign a reward for gaining information
             reward = REWARD_FOR_DISCOVERY  # Adjust the reward value as needed
-
+            
             # Update AI's memory for reinforcement learning
             next_state = self.get_state(player)
             agent.remember(state, action_index, reward, next_state, False)
@@ -385,7 +406,7 @@ class Game:
 
             # Assign a reward for gaining information
             reward = REWARD_FOR_DISCOVERY_OPPONENT  # Adjust this reward value as needed
-
+            
             # Update AI's memory for reinforcement learning
             next_state = self.get_state(player)
             agent.remember(state, action_index, reward, next_state, False)
@@ -469,7 +490,7 @@ class Game:
                 reward = -2  # Penalty for increasing score
             else:
                 reward = 1  # Small reward for neutral swap
-
+            
             # Update AI memory
             next_state = self.get_state(player)
             agent.remember(state, take_action_index, reward, next_state, False)
